@@ -334,19 +334,26 @@ namespace llc_newVer_Updater
                 bool updateod = false;
                 try
                 {
-                    localJson = JsonNode.Parse(File.ReadAllText(LangDatePath)).AsObject();
-                    var appOldVersion = localJson["version"].GetValue<string>();
-                    localTextVersion = localJson["resource_version"].GetValue<int>();
-                    if (localJson["need_fix"].GetValue<bool>())
-                    {
-                        LogWarning("Need Fix,fixing...");
-                        Directory.Delete(Path.Combine(LangPath, LLCLangName), true);
-                        updateod = true;
-                    }
+                        localJson = JsonNode.Parse(File.ReadAllText(LangDatePath)).AsObject();
+                        var appOldVersion = localJson["version"].GetValue<string>();
+                        localTextVersion = localJson["resource_version"].GetValue<int>();
+                        if (localJson["need_fix"].GetValue<bool>())
+                        {
+                            LogWarning("Need Fix,fixing...");
+                            Directory.Delete(Path.Combine(LangPath, LLCLangName), true);
+                            updateod = true;
+                        }
+                  
+                    
                 }
                 catch (System.Text.Json.JsonException ex)
                 {
                     LogWarning($"Local JSON parsing failed: {ex} \n Suppose need update,In Fact this mean good :)");
+                    updateod = true;
+                }
+                catch (FileNotFoundException ex)
+                {
+                    LogWarning($"Local JSON not found: {ex} \n Suppose need update,In Fact this mean good :)");
                     updateod = true;
                 }
                 try
