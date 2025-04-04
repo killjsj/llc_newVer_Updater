@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{A331B075-5321-43BB-BC1E-683B538014B0}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>lllc_newVer_Updater</RootNamespace>
-    <AssemblyName>lllc_newVer_Updater</AssemblyName>
+    <RootNamespace>llc_newVer_Updater</RootNamespace>
+    <AssemblyName>llc_newVer_Updater</AssemblyName>
     <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>

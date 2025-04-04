@@ -103,7 +103,7 @@ namespace llc_newVer_Updater
         static void read_Resources()
         {
             // 读取资源文件
-            ResourceManager resourceManager = new ResourceManager("lllc_newVer_Updater.Properties.Resources", Assembly.GetExecutingAssembly());
+            ResourceManager resourceManager = new ResourceManager("llc_newVer_Updater.Properties.Resources", Assembly.GetExecutingAssembly());
             ResourceSet resourceSet = resourceManager.GetResourceSet(System.Globalization.CultureInfo.CurrentCulture, true, true);
             Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory));
             foreach (DictionaryEntry entry in resourceSet)
