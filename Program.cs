@@ -137,6 +137,7 @@ namespace llc_newVer_Updater
             var handle = NativeMethods.GetStdHandle(-11);
             NativeMethods.GetConsoleMode(handle, out int mode);
             NativeMethods.SetConsoleMode(handle, mode | 0x4);
+            bool error = false;
             LogError = (msg) => {Console.WriteLine("\x1b[38;2;255;0;0mError:" + msg); };
             LogWarning = (msg) => { Console.WriteLine("\x1b[38;2;255;255;0mWarn:" + msg); };
             LogInfo = (msg) => { Console.WriteLine("\x1b[38;2;255;255;255mInfo:" + msg); };
@@ -193,6 +194,7 @@ namespace llc_newVer_Updater
             {
                 LogError(e + "\nSomething happend,set need_fix -> true (clear all version.json? lol) for next fix");
                 LogInfo("starting game anyway LoL");
+                error = true;
             }
 
             finally
@@ -209,10 +211,14 @@ namespace llc_newVer_Updater
                 Process.Start(startInfo);
                 Thread.Sleep(2000); // 等待生效
                 set_Hook_LC_start(true);
+                GenUpdateText();
 
-                LogInfo("Game Start Success. Press Enter to exit...");
-                Console.ReadLine();
-            }
+                if (error)
+                {
+                    LogInfo("Game Start Success. Press Enter to exit...");
+                    Console.ReadLine();
+                }
+                }
             return;
         }
         #region 使用映像劫持拦截
