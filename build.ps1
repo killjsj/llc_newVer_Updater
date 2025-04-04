@@ -1,6 +1,7 @@
 param(
     [string]$version
 	)
+dotnet restore llc_newVer_Updater.sln
 dotnet build llc_newVer_Updater.sln
 set-location bin\Debug
 $Path = "Release"
