@@ -57,5 +57,5 @@ jobs:
           files: |
             Release/LLC_newver_${{ steps.timestamp.outputs.filename }}.7z
           body_path: CHANGELOG.md
-          tag_name: "new release: ${{ steps.timestamp.outputs.tag_name }}"
+          tag_name: ${{ steps.timestamp.outputs.tag_name}}
           
