@@ -2,30 +2,50 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.IO;
-using System.Net;
-using System.Net.Http;
 using System.Reflection;
-using System;
-using System.Dynamic;
 using System.Text.Json;
-using System.Threading.Tasks;
-using static System.Net.Mime.MediaTypeNames;
 using System.Text.Json.Nodes;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
-using System.IO.Pipes;
+using Microsoft.Win32;
+using System.Collections;
+using System.Resources;
+using System.Runtime.InteropServices;
+using System.Timers;
+using System.Threading;
 
-namespace lllc_newVer_Updater
+namespace llc_newVer_Updater
 {
 
     class Program
     {
+        internal class NativeMethods
+        {
+            [DllImport("kernel32.dll", SetLastError = true)]
+            public static extern bool SetConsoleMode(IntPtr hConsoleHandle, int mode);
+
+            [DllImport("kernel32.dll", SetLastError = true)]
+            public static extern bool GetConsoleMode(IntPtr handle, out int mode);
+
+            [DllImport("kernel32.dll", SetLastError = true)]
+            public static extern IntPtr GetStdHandle(int handle);
+        }
+
         public class LangJson
         {
             [JsonPropertyName("lang")]
             public string lang { get; set; }
+        }
+        public class tempRestart
+        {
+            [JsonPropertyName("status")]
+            public int status { get; set; }
+            [JsonPropertyName("loadedlist")]
+            public List<string> loadedlist { get; set; }
+            [JsonPropertyName("args")]
+            public string[] args { get; set; }
+
         }
         public class verjson
         {
@@ -50,10 +70,10 @@ namespace lllc_newVer_Updater
         public static string LangFontPath = "";
         public static string LangDatePath = "";
         public static string GamePath = "";
+        public static string GameExePath = "";
 
 
         public static int TimeOuted = 10;
-        public static bool AutoUpdate = true;
         public static NodeType UpdateUri = NodeType.Auto;
 
         public static readonly Dictionary<NodeType, string> UrlDictionary = new Dictionary<NodeType, string>{
@@ -70,42 +90,157 @@ namespace lllc_newVer_Updater
         public static string TMPUpdateVersion = string.Empty;
         public static string ResourceOldVersion = string.Empty;
         public static string ResourceUpdateVersion = string.Empty;
-        public static string LLCLangName = "CN";
+        public static string LLCLangName = "LLC_CN";
         public static string UpdateMessage = string.Empty;
 
         public static Action<string> LogError { get; set; }
         public static Action<string> LogWarning { get; set; }
         public static Action<string> LogInfo { get; set; }
+        public static Action<string> _LogDebug { get; set; }
+
+        public static List<string> loaded_list = new List<string>();
+        public static List<string> loaded_n_list = new List<string>();
+        static void read_Resources()
+        {
+            // 读取资源文件
+            ResourceManager resourceManager = new ResourceManager("lllc_newVer_Updater.Properties.Resources", Assembly.GetExecutingAssembly());
+            ResourceSet resourceSet = resourceManager.GetResourceSet(System.Globalization.CultureInfo.CurrentCulture, true, true);
+            Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory));
+            foreach (DictionaryEntry entry in resourceSet)
+            {
+                string resourceName = entry.Key.ToString();
+                object resourceValue = entry.Value;
+                if (resourceValue is byte[] && !loaded_list.Contains(resourceName))
+                {
+                    byte[] byteArray = (byte[])resourceValue;
+                    string outputPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, resourceName);
+                    File.WriteAllBytes(outputPath, byteArray);
+                    loaded_list.Add(resourceName);
+                    _LogDebug($"Resource release:{resourceName} -> {outputPath}");
+                }
+            }
+            foreach(string resourceName in loaded_list)
+            {
+                string outputPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, resourceName);
+                if (File.Exists(outputPath))
+                {
+                    if (resourceName.EndsWith(".dll") && resourceName != "7z.dll")
+                    {
+                         Assembly.LoadFrom(outputPath);
+                    }
+                }
+            }
+        }
         static void Main(string[] args)
         {
+
+            var handle = NativeMethods.GetStdHandle(-11);
+            NativeMethods.GetConsoleMode(handle, out int mode);
+            NativeMethods.SetConsoleMode(handle, mode | 0x4);
+            LogError = (msg) => {Console.WriteLine("\x1b[38;2;255;0;0mError:" + msg); };
+            LogWarning = (msg) => { Console.WriteLine("\x1b[38;2;255;255;0mWarn:" + msg); };
+            LogInfo = (msg) => { Console.WriteLine("\x1b[38;2;255;255;255mInfo:" + msg); };
+            _LogDebug = (msg) => { Console.WriteLine("\x1b[38;2;160;160;160m" + msg); };
             try
             {
-                GamePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (args.Length < 1)
+                {
+                    LogError("GamePath(args[0]) is null,Suppose GamePath to Local Location");
+                    GamePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                    GameExePath = GamePath + "/LimbusCompany.exe";
+                }
+                else
+                {
+                    args = args.ToArray();
+                    GameExePath = args[0];
+                    GamePath = Path.GetDirectoryName(GameExePath);
+                    LogInfo("GamePath:" + GamePath);
+                    LogInfo("GameExePath:" + GameExePath);
+                }
+                if (string.IsNullOrEmpty(GamePath))
+                {
+                    LogError("GamePath(args[1]) is null,Suppose GamePath to Local Location");
+                    GamePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                }
                 LangPath = Path.Combine(GamePath, "LimbusCompany_Data", "Lang");
                 LangDatePath = Path.Combine(GamePath, "LimbusCompany_Data", "Lang", LLCLangName, "version.json");
                 LangFontPath = Path.Combine(LangPath, LLCLangName, "Font");
                 LangConfigPath = Path.Combine(LangPath, "config.json");
-                LogError = (msg) => Console.WriteLine("Error:" + msg);
-                LogWarning = (msg) => Console.WriteLine("Warn:" + msg);
-                LogInfo = (msg) => Console.WriteLine("Info:" + msg);
+                if (!File.Exists(Path.GetFileName(Assembly.GetExecutingAssembly().Location) + ".config"))
+                {
+                    LogError("Can't Find Config File,creating...");
+                    ResourceManager resourceManager = new ResourceManager("lllc_newVer_Updater.Properties.Resources", Assembly.GetExecutingAssembly());
+                    ResourceSet resourceSet = resourceManager.GetResourceSet(System.Globalization.CultureInfo.CurrentCulture, true, true);
+                    foreach (DictionaryEntry entry in resourceSet)
+                    {
+                        string resourceName = entry.Key.ToString();
+                        object resourceValue = entry.Value;
+                        if (resourceName == "config")
+                        {
+                            string byteArray = (string)resourceValue;
+                            string outputPath = Path.GetFileName(Assembly.GetExecutingAssembly().Location) + ".config";
+                            File.WriteAllText(outputPath, byteArray);
+                            _LogDebug($"Resource release:{resourceName} -> {outputPath}");
+                        }
+                    }
+                    throw new FileNotFoundException("File " + Path.GetFileName(Assembly.GetExecutingAssembly().Location) + ".config NOT EXISTS! \n ---Error will fix when next start!--- ");
+                }
+                LogInfo("Releasing file...");
+                read_Resources();
+
                 Main_update();
             } catch (Exception e)
             {
-                Console.WriteLine("Error:" + e);
-                Console.WriteLine("Something happend,set need_fix -> true (clear all version.json) for next fix");
-                Console.WriteLine("starting game anyway LoL");
+                LogError(e + "\nSomething happend,set need_fix -> true (clear all version.json? lol) for next fix");
+                LogInfo("starting game anyway LoL");
             }
+
             finally
             {
-                Console.WriteLine("Starting Game...");
-                ProcessStartInfo startInfo = new ProcessStartInfo();
-                startInfo.FileName = GamePath + "/LimbusCompany.exe";
-                startInfo.Arguments = string.Join(" ", args.Skip(1));
+                LogInfo("Starting Game...");
+                set_Hook_LC_start(false);
+                Thread.Sleep(200); // 等待生效
+
+                ProcessStartInfo startInfo = new ProcessStartInfo()
+                {
+                    FileName = GamePath + "/LimbusCompany.exe",
+                    Arguments = string.Join(" ", args.Skip(1)),
+                };
                 Process.Start(startInfo);
+                Thread.Sleep(2000); // 等待生效
+                set_Hook_LC_start(true);
+
+                LogInfo("Game Start Success. Press Enter to exit...");
+                Console.ReadLine();
+            }
+            return;
+        }
+        #region 使用映像劫持拦截
+
+        static void set_Hook_LC_start(bool status)
+        {
+            LogInfo("Set Hook to:" + status);
+            RegistryKey reg;
+            reg = Registry.LocalMachine;
+            reg = reg.CreateSubKey(@"Software\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\LimbusCompany.exe");
+            if(reg == null)
+            {
+                return;    
+            }
+            if(status)
+            {
+                reg.SetValue("Debugger", Assembly.GetExecutingAssembly().Location);
+            }
+            else
+            {
+                reg.DeleteValue("Debugger",false);
             }
         }
+        #endregion
+
         static void Main_update()
         {
+            
             if (!Directory.Exists(LangPath))
             {
                 LogWarning("Can't Find Lang Path,creating...");
@@ -137,9 +272,10 @@ namespace lllc_newVer_Updater
                 string tempjsonString = JsonSerializer.Serialize(langJson);
                 File.WriteAllText(LangConfigPath, tempjsonString);
             }
+            LogInfo("----- Init Message End -----");
             LogInfo("LimbusCompany Lang Update Tool");
             LogInfo("开始检查...");
-            //检查安装汉化,由于sb小金不给全多语言的json,就只能替换了
+            //修改使用语言
             string jsonString = File.ReadAllText(LangConfigPath);
             LangJson langJson1 = JsonSerializer.Deserialize<LangJson>(jsonString);
             if (langJson1.lang != LLCLangName)
@@ -154,23 +290,8 @@ namespace lllc_newVer_Updater
                 LogError("Can't Find HotUpdate Need File(7z.exe/7z.dll). Skip Mod Update.");
                 return;
             }
-            if (AutoUpdate)
-            {
-                LogInfo("自动更新");
-            }else{
-                LogInfo("手动更新");
-            }
-            if (UpdateUri == NodeType.Auto)
-            {
-                LogInfo("自动选择更新源");
-            }
-            else
-            {
-                LogInfo("手动选择更新源");
-            }
             LogInfo("LangPath: " + LangPath);
             LogInfo("GamePath: " + GamePath);
-            LogInfo("AutoUpdate: " + AutoUpdate);
             LogInfo("开始检查更新...");
             CheckUpdate();
         }
@@ -239,9 +360,16 @@ namespace lllc_newVer_Updater
                 if (serverJson != null && latestTextVersion > localTextVersion || updateod)
                 {
                     LogInfo("New text resource found. Download resource.");
+                    //0协arc了llcrelease,等待更新....
+                    
+                    LogInfo("Copying EN data to avoid UNKOWN....");
+                    string ENdatapath = Path.Combine(GamePath, "LimbusCompany_Data","Assets","Resources_moved","Localize","en");
+                    CopyDirectory(ENdatapath, Path.Combine(LangPath, LLCLangName));
+                    LogInfo("Downloading new text resource...");
                     var updatelog = $"LimbusLocalize_Resource_{latestTextVersion}.7z";
+                    //new:0协将文件迁移到了https://github.com/LocalizeLimbusCompany/LocalizeLimbusCompany good!
                     var downloadUri = UpdateUri == NodeType.GitHub
-                        ? $"https://github.com/LocalizeLimbusCompany/LLC_Release/releases/download/{latestTextVersion}/{updatelog}"
+                        ? $"https://github.com/LocalizeLimbusCompany/LocalizeLimbusCompany/releases/download/{latestTextVersion}/{updatelog}"
                         : string.Format(UrlDictionary[UpdateUri], "Resource/" + updatelog);
                     var filename = Path.Combine(GamePath, updatelog);
                     if (!File.Exists(filename))
