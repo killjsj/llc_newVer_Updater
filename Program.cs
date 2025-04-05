@@ -50,9 +50,7 @@ namespace llc_newVer_Updater
         public class verjson
         {
             [JsonPropertyName("version")]
-            public string version { get; set; }
-            [JsonPropertyName("resource_version")]
-            public int resource_version { get; set; }
+            public int version { get; set; }
             [JsonPropertyName("notice")]
             public string notice { get; set; }
             [JsonPropertyName("need_fix")]
@@ -90,7 +88,8 @@ namespace llc_newVer_Updater
         public static string TMPUpdateVersion = string.Empty;
         public static string ResourceOldVersion = string.Empty;
         public static string ResourceUpdateVersion = string.Empty;
-        public static string LLCLangName = "LLC_CN";
+        public static string LLCLangName = "LLC_zh-CN";
+        public static string fontname = "ChineseFont.ttf";
         public static string UpdateMessage = string.Empty;
 
         public static Action<string> LogError { get; set; }
@@ -164,7 +163,7 @@ namespace llc_newVer_Updater
                     GamePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
                 }
                 LangPath = Path.Combine(GamePath, "LimbusCompany_Data", "Lang");
-                LangDatePath = Path.Combine(GamePath, "LimbusCompany_Data", "Lang", LLCLangName, "version.json");
+                LangDatePath = Path.Combine(GamePath, "LimbusCompany_Data", "Lang", LLCLangName,"Info", "version.json");
                 LangFontPath = Path.Combine(LangPath, LLCLangName, "Font");
                 LangConfigPath = Path.Combine(LangPath, "config.json");
                 if (!File.Exists(Path.GetFileName(Assembly.GetExecutingAssembly().Location) + ".config"))
@@ -265,6 +264,7 @@ namespace llc_newVer_Updater
             if (!File.Exists(LangDatePath))
             {
                 LogWarning("Can't Find Lang Date Path,creating...");
+                Directory.CreateDirectory(Path.Combine(GamePath, "LimbusCompany_Data", "Lang", LLCLangName, "Info"));
                 File.Create(LangDatePath).Close();
             }
             if (!File.Exists(LangConfigPath))
@@ -335,8 +335,7 @@ namespace llc_newVer_Updater
                 try
                 {
                         localJson = JsonNode.Parse(File.ReadAllText(LangDatePath)).AsObject();
-                        var appOldVersion = localJson["version"].GetValue<string>();
-                        localTextVersion = localJson["resource_version"].GetValue<int>();
+                        localTextVersion= localJson["version"].GetValue<int>();
                         if (localJson["need_fix"].GetValue<bool>())
                         {
                             LogWarning("Need Fix,fixing...");
@@ -351,6 +350,11 @@ namespace llc_newVer_Updater
                     LogWarning($"Local JSON parsing failed: {ex} \n Suppose need update,In Fact this mean good :)");
                     updateod = true;
                 }
+                catch (System.InvalidOperationException ex)
+                {
+                    LogWarning($"Local JSON parsing failed: {ex} \n Suppose need update,In Fact this mean good :)");
+                    updateod = true;
+                }
                 catch (FileNotFoundException ex)
                 {
                     LogWarning($"Local JSON not found: {ex} \n Suppose need update,In Fact this mean good :)");
@@ -361,8 +365,7 @@ namespace llc_newVer_Updater
                     var response = Client.GetStringAsync("https://api.zeroasso.top/v2/resource/get_version").GetAwaiter()
                         .GetResult();
                     serverJson = JsonNode.Parse(response).AsObject();
-                    var tag = serverJson["version"].GetValue<string>();
-                    latestTextVersion = serverJson["resource_version"].GetValue<int>();
+                    latestTextVersion = serverJson["version"].GetValue<int>();
 
                 }
                 catch (System.Text.Json.JsonException ex)
@@ -379,20 +382,20 @@ namespace llc_newVer_Updater
                     string ENdatapath = Path.Combine(GamePath, "LimbusCompany_Data","Assets","Resources_moved","Localize","en");
                     CopyDirectory(ENdatapath, Path.Combine(LangPath, LLCLangName));
                     LogInfo("Downloading new text resource...");
-                    var updatelog = $"LimbusLocalize_Resource_{latestTextVersion}.7z";
+                    var updatelog = $"LimbusLocalize_{latestTextVersion}.7z";
                     //new:0协将文件迁移到了https://github.com/LocalizeLimbusCompany/LocalizeLimbusCompany good!
                     var downloadUri = UpdateUri == NodeType.GitHub
                         ? $"https://github.com/LocalizeLimbusCompany/LocalizeLimbusCompany/releases/download/{latestTextVersion}/{updatelog}"
-                        : string.Format(UrlDictionary[UpdateUri], "Resource/" + updatelog);
+                        : string.Format(UrlDictionary[UpdateUri], updatelog);
                     var filename = Path.Combine(GamePath, updatelog);
                     if (!File.Exists(filename))
                         DownloadFile(downloadUri, filename);
-                    string tempPath = LangPath;
+                    string tempPath = GamePath;
                     //解压
                     UnarchiveFile(filename, tempPath);
-                    string TargetFolder = Path.Combine(LangPath, "BepInEx\\plugins\\LLC\\Localize\\CN");
-                    CopyDirectory(TargetFolder, Path.Combine(LangPath, LLCLangName));
-                    Directory.Delete(Path.Combine(tempPath, "BepInEx\\"),true);
+                    //string TargetFolder = Path.Combine(LangPath, "BepInEx\\plugins\\LLC\\Localize\\CN");
+                    //CopyDirectory(TargetFolder, Path.Combine(LangPath, LLCLangName));
+                    //Directory.Delete(Path.Combine(tempPath, "BepInEx\\"),true);
                     //更新版本号
                     ResourceOldVersion = localTextVersion.ToString();
                     ResourceUpdateVersion = latestTextVersion.ToString();
@@ -400,8 +403,7 @@ namespace llc_newVer_Updater
                     LogInfo("Mod Update Success.");
                     verjson newJson = new verjson()
                     {
-                        version = serverJson["version"].GetValue<string>(),
-                        resource_version = latestTextVersion,
+                        version = serverJson["version"].GetValue<int>(),
                         notice = serverJson["notice"].GetValue<string>(),
                         need_fix = false
                     };
@@ -422,8 +424,7 @@ namespace llc_newVer_Updater
                 //更新need_fix
                 verjson newJson = new verjson()
                 {
-                    version = "0.0.0",
-                    resource_version = 0,
+                    version = 0,
                     notice = "Update Failed",
                     need_fix = true
                 };
@@ -441,54 +442,26 @@ namespace llc_newVer_Updater
                     LogWarning("Can't Find Font Path,creating...");
                     Directory.CreateDirectory(LangFontPath);
                 }
-                var fontPath = LangFontPath + "/languagefont.ttf";
-                if (!File.Exists(LangFontPath + "/languagefont.ttf"))
+
+                var fontPath = LangFontPath + "/" + fontname;
+                if (!File.Exists(fontPath))
                 {
-                    LogWarning("Can't Find Font File,copying...");
-                    File.Copy(GamePath+ "/languagefont.ttf", LangFontPath + "/languagefont.ttf");
+                    LogWarning("Can't Find Font File,installing");
+                    var download_uri = UpdateUri == NodeType.GitHub
+                    ? "https://raw.githubusercontent.com/LocalizeLimbusCompany/LocalizeLimbusCompany/refs/heads/main/Fonts/LLCCN-Font.7z"
+                    : string.Format(UrlDictionary[UpdateUri], "LLCCN-Font.7z");
+                    {
+                        var filename = Path.Combine(GamePath, "LLCCN-Font.7z");
+                        if (!File.Exists(filename))
+                            DownloadFile(download_uri, filename);
+                        UnarchiveFile(filename, GamePath);
+                        LogInfo("Chinese Font Asset Update Success.");
+                    }
                 }
-                // 看0协怎么改吧,md直接AssetBundle.LoadFromFile也是个人物
+                // 看0协怎么改吧,md直接AssetBundle.LoadFromFile也是个人物 NEWW:好消息 ttf启动!
 
 
-                //var releaseUri = UpdateUri == NodeType.GitHub
-                //    ? "https://api.github.com/repos/LocalizeLimbusCompany/LLC_ChineseFontAsset/releases/latest"
-                //    : "https://api.zeroasso.top/v2/get_api/get/repos/LocalizeLimbusCompany/LLC_ChineseFontAsset/releases/latest";
-                //var response = Client.GetStringAsync(releaseUri).GetAwaiter().GetResult();
-                //var latest = JsonNode.Parse(response).AsObject();
-                //var latestReleaseTag = int.Parse(latest["tag_name"].GetValue<string>());
-                //var fontPath = LangFontPath + "/languagefont.ttf";
-                //var lastWriteTime = File.Exists(fontPath)
-                //    ? int.Parse(TimeZoneInfo.ConvertTime(new FileInfo(fontPath).LastWriteTime,
-                //        TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")).ToString("yyMMdd"))
-                //    : 0;
-                //if (lastWriteTime < latestReleaseTag)
-                //{
-                //    string updatelog;
-                //    string downloadUri;
-                //    if (UpdateUri == NodeType.GitHub)
-                //    {
-                //        updatelog = $"tmpchinesefont_BIE_{latestReleaseTag}.7z";
-                //        downloadUri =
-                //            $"https://github.com/LocalizeLimbusCompany/LLC_ChineseFontAsset/releases/download/{latestReleaseTag}/{updatelog}";
-                //    }
-                //    else
-                //    {
-                //        updatelog = "tmpchinesefont_BIE.7z";
-                //        downloadUri = string.Format(UrlDictionary[UpdateUri], updatelog);
-                //    }
-
-                //    var filename = Path.Combine(GamePath, updatelog);
-                //    if (!File.Exists(filename))
-                //        DownloadFile(downloadUri, filename);
-                //    UnarchiveFile(filename, GamePath);
-                //    TMPUpdateVersion = latestReleaseTag.ToString();
-                //    TMPOldVersion = lastWriteTime.ToString();
-                //    LogInfo("Chinese Font Asset Update Success.");
-                //}
-                //else
-                //{
-                //    LogInfo("No new font asset found.");
-                //}
+                
             }
             catch (Exception ex)
             {
