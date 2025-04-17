@@ -103,16 +103,6 @@ namespace llc_newVer_Updater.Properties {
         /// <summary>
         ///   查找 System.Byte[] 类型的本地化资源。
         /// </summary>
-        public static byte[] languagefont_ttf {
-            get {
-                object obj = ResourceManager.GetObject("languagefont.ttf", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   查找 System.Byte[] 类型的本地化资源。
-        /// </summary>
         public static byte[] Microsoft_Bcl_AsyncInterfaces_dll {
             get {
                 object obj = ResourceManager.GetObject("Microsoft.Bcl.AsyncInterfaces.dll", resourceCulture);

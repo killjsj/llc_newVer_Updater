@@ -442,9 +442,11 @@ namespace llc_newVer_Updater
                     LogWarning("Can't Find Font Path,creating...");
                     Directory.CreateDirectory(LangFontPath);
                 }
-
+                string Targetttf = Path.Combine(GamePath, "LimbusCompany_Data", "Lang", "LLC_zh-CN", "Font", "ChineseFont.ttf");
+                string Titlettf = Path.Combine(GamePath, "LimbusCompany_Data", "Lang", "LLC_zh-CN", "Font", "Title");
+                string Contextttf = Path.Combine(GamePath, "LimbusCompany_Data", "Lang", "LLC_zh-CN", "Font", "Context");
                 var fontPath = LangFontPath + "/" + fontname;
-                if (!File.Exists(fontPath))
+                if (!File.Exists(fontPath) || !Directory.Exists(Contextttf) || !Directory.Exists(Titlettf))
                 {
                     LogWarning("Can't Find Font File,installing");
                     var download_uri = UpdateUri == NodeType.GitHub
@@ -455,6 +457,16 @@ namespace llc_newVer_Updater
                         if (!File.Exists(filename))
                             DownloadFile(download_uri, filename);
                         UnarchiveFile(filename, GamePath);
+                        //sb小金背刺王
+                        
+                        if (File.Exists(Targetttf) || !Directory.Exists(Contextttf) || !Directory.Exists(Titlettf)) // 小金笑传之背被刺
+                        {
+                            Directory.CreateDirectory(Titlettf);
+                            Directory.CreateDirectory(Contextttf);
+                            File.Copy(Targetttf, Path.Combine(Titlettf, "ChineseFont.ttf"), true);
+                            File.Copy(Targetttf, Path.Combine(Contextttf, "ChineseFont.ttf"), true);
+                            File.Delete(Targetttf);
+                        }
                         LogInfo("Chinese Font Asset Update Success.");
                     }
                 }
