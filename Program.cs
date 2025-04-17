@@ -309,20 +309,7 @@ namespace llc_newVer_Updater
             LogInfo("Check Chinese Font Asset Update");
             ChineseFontUpdate();
         }
-        private static void CopyDirectory(string sourceDir, string destDir)
-        {
-            Directory.CreateDirectory(destDir);
-            foreach (var file in Directory.GetFiles(sourceDir))
-            {
-                var destFile = Path.Combine(destDir, Path.GetFileName(file));
-                File.Copy(file, destFile, true);
-            }
-            foreach (var directory in Directory.GetDirectories(sourceDir))
-            {
-                var destDirectory = Path.Combine(destDir, Path.GetFileName(directory));
-                CopyDirectory(directory, destDirectory);
-            }
-        }
+
         static void ModUpdate()
         {
             try
@@ -378,9 +365,8 @@ namespace llc_newVer_Updater
                     LogInfo("New text resource found. Download resource.");
                     //0协arc了llcrelease,等待更新....
                     
-                    LogInfo("Copying EN data to avoid UNKOWN....");
+                    //LogInfo("Copying EN data to avoid UNKOWN...."); I CANT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                     string ENdatapath = Path.Combine(GamePath, "LimbusCompany_Data","Assets","Resources_moved","Localize","en");
-                    CopyDirectory(ENdatapath, Path.Combine(LangPath, LLCLangName));
                     LogInfo("Downloading new text resource...");
                     var updatelog = $"LimbusLocalize_{latestTextVersion}.7z";
                     //new:0协将文件迁移到了https://github.com/LocalizeLimbusCompany/LocalizeLimbusCompany good!
@@ -393,6 +379,7 @@ namespace llc_newVer_Updater
                     string tempPath = GamePath;
                     //解压
                     UnarchiveFile(filename, tempPath);
+
                     //string TargetFolder = Path.Combine(LangPath, "BepInEx\\plugins\\LLC\\Localize\\CN");
                     //CopyDirectory(TargetFolder, Path.Combine(LangPath, LLCLangName));
                     //Directory.Delete(Path.Combine(tempPath, "BepInEx\\"),true);
@@ -446,7 +433,7 @@ namespace llc_newVer_Updater
                 string Titlettf = Path.Combine(GamePath, "LimbusCompany_Data", "Lang", "LLC_zh-CN", "Font", "Title");
                 string Contextttf = Path.Combine(GamePath, "LimbusCompany_Data", "Lang", "LLC_zh-CN", "Font", "Context");
                 var fontPath = LangFontPath + "/" + fontname;
-                if (!File.Exists(fontPath) || !Directory.Exists(Contextttf) || !Directory.Exists(Titlettf))
+                if (!Directory.Exists(Contextttf) || !Directory.Exists(Titlettf))
                 {
                     LogWarning("Can't Find Font File,installing");
                     var download_uri = UpdateUri == NodeType.GitHub
