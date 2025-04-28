@@ -365,8 +365,11 @@ namespace llc_newVer_Updater
                     LogInfo("New text resource found. Download resource.");
                     //0协arc了llcrelease,等待更新....
                     
-                    //LogInfo("Copying EN data to avoid UNKOWN...."); I CANT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    string ENdatapath = Path.Combine(GamePath, "LimbusCompany_Data","Assets","Resources_moved","Localize","en");
+                    LogInfo("Copying EN data to avoid UNKOWN...."); //I CAN!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    if (!updateod)
+                    {
+                        mainfb(1);
+                    }
                     LogInfo("Downloading new text resource...");
                     var updatelog = $"LimbusLocalize_{latestTextVersion}.7z";
                     //new:0协将文件迁移到了https://github.com/LocalizeLimbusCompany/LocalizeLimbusCompany good!
@@ -379,6 +382,7 @@ namespace llc_newVer_Updater
                     string tempPath = GamePath;
                     //解压
                     UnarchiveFile(filename, tempPath);
+                    mainfb(0);
 
                     //string TargetFolder = Path.Combine(LangPath, "BepInEx\\plugins\\LLC\\Localize\\CN");
                     //CopyDirectory(TargetFolder, Path.Combine(LangPath, LLCLangName));
@@ -419,6 +423,28 @@ namespace llc_newVer_Updater
                 File.WriteAllText(LangDatePath, jsonString);
             }
         }
+        private static void mainfb(int op)
+        {
+            string or = Path.Combine(GamePath, "LimbusCompany_Data", "Assets", "Resources_moved", "en", "Localize");
+
+            var d = Directory.EnumerateFiles(Path.Combine(GamePath, "LimbusCompany_Data", "Lang", LLCLangName), "*", SearchOption.AllDirectories);
+            foreach (var n in d) { 
+                var fn = Path.GetFileName(n);
+                if (fn == "version.json")
+                {
+                    continue;
+                }
+                if (op == 1)
+                {
+                    fn = fn.Replace("EN_", "");
+                    File.Copy(Path.Combine(or,fn), n, true);
+                } else if (op == 0)
+                {
+                    enfallback(Path.GetFileName(n));
+                }
+            }
+            //enfallback()
+        }
         private static void ChineseFontUpdate()
         {
             try
@@ -446,12 +472,8 @@ namespace llc_newVer_Updater
                         UnarchiveFile(filename, GamePath);
                         //sb小金背刺王
                         
-                        if (File.Exists(Targetttf) || !Directory.Exists(Contextttf) || !Directory.Exists(Titlettf)) // 小金笑传之背被刺
+                        if (File.Exists(Targetttf)) // 小金笑传之背被刺
                         {
-                            Directory.CreateDirectory(Titlettf);
-                            Directory.CreateDirectory(Contextttf);
-                            File.Copy(Targetttf, Path.Combine(Titlettf, "ChineseFont.ttf"), true);
-                            File.Copy(Targetttf, Path.Combine(Contextttf, "ChineseFont.ttf"), true);
                             File.Delete(Targetttf);
                         }
                         LogInfo("Chinese Font Asset Update Success.");
@@ -467,7 +489,67 @@ namespace llc_newVer_Updater
                 LogWarning($"Font asset update failed:\n{ex}");
             }
         }
+        static void enfallback(string targetjson)
+        {
+            string targetFilePath = Path.Combine(GamePath, "LimbusCompany_Data", "Lang", "LLC_zh-CN", targetjson);
+            string sourceFilePath = Path.Combine(GamePath, "LimbusCompany_Data", "Assets", "Resources_moved", "Localize", "en", "EN_" + targetjson);
+            JsonObject targetJson = null;
+            JsonObject sourceJson = null;
+            try
+            {
+                // 读取目标文件和源文件  
+                targetJson = JsonNode.Parse(File.ReadAllText(targetFilePath)) as JsonObject;
+                sourceJson = JsonNode.Parse(File.ReadAllText(sourceFilePath)) as JsonObject;
+            } catch (System.Text.Json.JsonException ex)
+            {
+                LogWarning($"JSON parsing failed: {ex} \n Suppose need update,In Fact this mean good :)");
+                return;
+            }
+            catch (FileNotFoundException ex)
+            {
+                LogWarning($"File not found: {ex} \n Suppose need update,In Fact this mean good :)");
+                return;
+            }
 
+            if (targetJson == null || sourceJson == null)
+            {
+                Console.WriteLine("JSON 文件格式错误！");
+                return;
+            }
+
+            // 获取 dataList 数组  
+            var targetDataList = targetJson["dataList"]?.AsArray();
+            var sourceDataList = sourceJson["dataList"]?.AsArray();
+            if (targetDataList == null || sourceDataList == null)
+            {
+                Console.WriteLine("dataList 节点不存在！");
+                return;
+            }
+
+            // 获取目标文件中已有的 ID 列表  
+            var existingIds = targetDataList
+                .Select(item => item["id"]?.ToString() ?? item["id"]?.GetValue<int>().ToString())
+                .Where(id => id != null)
+                .ToHashSet();
+
+            // 遍历源文件，查找缺失的条目  
+            foreach (var sourceItem in sourceDataList)
+            {
+                string id = sourceItem["id"]?.ToString() ?? sourceItem["id"]?.GetValue<int>().ToString();
+                if (id != null && !existingIds.Contains(id))
+                {
+                    // 创建 sourceItem 的深拷贝
+                    var newItem = JsonNode.Parse(sourceItem.ToJsonString());
+                    targetDataList.Add(newItem);
+                    Console.WriteLine($"fallback: id = {id}, sourceItem = {sourceItem}");
+                }
+            }
+
+            // 将更新后的 JSON 写回目标文件  
+            File.WriteAllText(targetFilePath, JsonSerializer.Serialize(targetJson, new JsonSerializerOptions { WriteIndented = true ,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping // 禁用 Unicode 转义
+            }));
+        }
         private static void DownloadFile(string uri, string filePath)
         {
             try
