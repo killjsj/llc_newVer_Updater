@@ -14,6 +14,7 @@ using System.Resources;
 using System.Runtime.InteropServices;
 using System.Timers;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace llc_newVer_Updater
 {
@@ -323,7 +324,12 @@ namespace llc_newVer_Updater
                 {
                         localJson = JsonNode.Parse(File.ReadAllText(LangDatePath)).AsObject();
                         localTextVersion= localJson["version"].GetValue<int>();
-                        if (localJson["need_fix"].GetValue<bool>())
+                        if (localJson["need_fix"] == null)
+                        {
+                            LogWarning("Local JSON parsing failed: version is null,Suppose need update,In Fact this mean good :)");
+                            updateod = true;
+                        }
+                    if (localJson["need_fix"].GetValue<bool>())
                         {
                             LogWarning("Need Fix,fixing...");
                             Directory.Delete(Path.Combine(LangPath, LLCLangName), true);
@@ -366,10 +372,6 @@ namespace llc_newVer_Updater
                     //0协arc了llcrelease,等待更新....
                     
                     LogInfo("Copying EN data to avoid UNKOWN...."); //I CAN!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    if (!updateod)
-                    {
-                        mainfb(1);
-                    }
                     LogInfo("Downloading new text resource...");
                     var updatelog = $"LimbusLocalize_{latestTextVersion}.7z";
                     //new:0协将文件迁移到了https://github.com/LocalizeLimbusCompany/LocalizeLimbusCompany good!
@@ -382,7 +384,7 @@ namespace llc_newVer_Updater
                     string tempPath = GamePath;
                     //解压
                     UnarchiveFile(filename, tempPath);
-                    mainfb(0);
+                    MainFallback();
 
                     //string TargetFolder = Path.Combine(LangPath, "BepInEx\\plugins\\LLC\\Localize\\CN");
                     //CopyDirectory(TargetFolder, Path.Combine(LangPath, LLCLangName));
@@ -423,27 +425,132 @@ namespace llc_newVer_Updater
                 File.WriteAllText(LangDatePath, jsonString);
             }
         }
-        private static void mainfb(int op)
+        private static void MainFallback()
         {
-            string or = Path.Combine(GamePath, "LimbusCompany_Data", "Assets", "Resources_moved", "en", "Localize");
+            //??? vs 拖速度可还行
+            string originalPath = Path.Combine(GamePath, "LimbusCompany_Data", "Assets", "Resources_moved", "Localize", "en");
+            string langPath = Path.Combine(GamePath, "LimbusCompany_Data", "Lang", "LLC_zh-CN");
+            var newdirectoryFiles = Directory.EnumerateFiles(originalPath, "*", SearchOption.AllDirectories).ToList();
+            Parallel.ForEach(newdirectoryFiles, processingFile => { 
+                var relativePath = processingFile.Substring(originalPath.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (Path.GetFileName(relativePath) is "version.json" || Path.GetExtension(relativePath) == ".ttf" || Path.GetExtension(relativePath) == ".otf" ||
+                !Path.HasExtension(relativePath))
+                {
+                    return;
+                }
+                try
+                {
+                    var newFilePath = Path.Combine(langPath, relativePath).Replace("EN_","");
+                    // 优化文件复制操作
+                    if (!File.Exists(newFilePath))
+                    {
+                        LogInfo($"coping file:{processingFile}->{newFilePath}");
+                        File.Copy(newFilePath, processingFile, overwrite: false);
+                    }
+                }
+                catch (IOException)
+                {
+                    //debug时看到报错一堆正常
+                }
+            });
+            LogInfo("EN data copy finished.");
+            var olddirectoryFiles = Directory.EnumerateFiles(langPath, "*", SearchOption.AllDirectories).ToList();
+            Parallel.ForEach(olddirectoryFiles, processingFile =>
+            {
+                //LogInfo($"processing:{processingFile}");
 
-            var d = Directory.EnumerateFiles(Path.Combine(GamePath, "LimbusCompany_Data", "Lang", LLCLangName), "*", SearchOption.AllDirectories);
-            foreach (var n in d) { 
-                var fn = Path.GetFileName(n);
-                if (fn == "version.json")
+                var relativePath = processingFile.Substring(langPath.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+                if (Path.GetFileName(relativePath) is "version.json" || Path.GetExtension(relativePath) == ".ttf" || Path.GetExtension(relativePath)  == ".otf" ||
+                !Path.HasExtension(relativePath))
                 {
-                    continue;
+                    return;
                 }
-                if (op == 1)
+
+                string directory = Path.GetDirectoryName(relativePath) ?? string.Empty;
+                string fileName = Path.GetFileName(relativePath);
+                string newFileName = Path.Combine(directory, $"EN_{fileName}");
+                string sourceFilePath = Path.Combine(originalPath, newFileName);
+
+                LogInfo($"processing file:{sourceFilePath}->{processingFile}");
+
+                
+
+                try
                 {
-                    fn = fn.Replace("EN_", "");
-                    File.Copy(Path.Combine(or,fn), n, true);
-                } else if (op == 0)
-                {
-                    enfallback(Path.GetFileName(n));
+                    // 优化 JSON 合并操作
+                    EnFallback(relativePath, Path.Combine(directory, $"EN_{fileName}"));
                 }
+                catch (FileNotFoundException ex)
+                {
+                    LogWarning(ex.Message);
+                }
+            });
+
+
+        }
+
+        static void EnFallback(string targetJson, string sourceJson)
+        {
+            string targetFilePath = Path.Combine(GamePath, "LimbusCompany_Data", "Lang", "LLC_zh-CN", targetJson);
+            string sourceFilePath = Path.Combine(GamePath, "LimbusCompany_Data", "Assets", "Resources_moved", "Localize", "en", sourceJson);
+            var found = true;
+            if (Path.GetExtension(sourceFilePath) == ".ttf" || Path.GetExtension(sourceFilePath) == ".otf" || Path.HasExtension(sourceFilePath))
+            {
+                return;
             }
-            //enfallback()
+            if (!File.Exists(targetFilePath))
+            {
+                LogInfo($"File not found: {targetJson} or {sourceJson}");
+                found = false;
+            }
+
+            try
+            {
+                var targetJsonObject = new JsonObject();
+                // 缓存 JSON 文件内容
+                if (!found)
+                {
+                    targetJsonObject = JsonNode.Parse(File.ReadAllText(targetFilePath)) as JsonObject;
+
+                }
+                var sourceJsonObject = JsonNode.Parse(File.ReadAllText(sourceFilePath)) as JsonObject;
+                if (found)
+                {
+                    if (targetJsonObject?["dataList"] is JsonArray targetDataList && sourceJsonObject?["dataList"] is JsonArray sourceDataList)
+                    {
+                        var existingIds = targetDataList
+                            .Select(item => item["id"]?.ToString() ?? item["id"]?.GetValue<int>().ToString())
+                            .Where(id => id != null)
+                            .ToHashSet();
+
+                        foreach (var sourceItem in sourceDataList)
+                        {
+                            string id = sourceItem["id"]?.ToString() ?? sourceItem["id"]?.GetValue<int>().ToString();
+                            if (id != null && !existingIds.Contains(id))
+                            {
+                                targetDataList.Add(JsonNode.Parse(sourceItem.ToJsonString()));
+                            }
+                        }
+
+                        // 优化 JSON 写入操作
+                        File.WriteAllText(targetFilePath, System.Text.Json.JsonSerializer.Serialize(targetJsonObject, new JsonSerializerOptions
+                        {
+                            WriteIndented = true,
+                            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                        }));
+                    }
+                }
+                else
+                {
+                    // 如果目标文件不存在，则直接复制源文件
+                    File.Copy(sourceFilePath, targetFilePath, true);
+                }
+                }
+            catch (Exception ex)
+            {
+                LogWarning($"Error during JSON processing: {ex}");
+            }
         }
         private static void ChineseFontUpdate()
         {
