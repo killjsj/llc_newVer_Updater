@@ -444,7 +444,7 @@ namespace llc_newVer_Updater
                     // 优化文件复制操作
                     if (!File.Exists(newFilePath))
                     {
-                        LogInfo($"coping file:{processingFile}->{newFilePath}");
+                        //LogInfo($"coping file:{processingFile}->{newFilePath}");
                         File.Copy(newFilePath, processingFile, overwrite: false);
                     }
                 }
@@ -472,7 +472,7 @@ namespace llc_newVer_Updater
                 string newFileName = Path.Combine(directory, $"EN_{fileName}");
                 string sourceFilePath = Path.Combine(originalPath, newFileName);
 
-                LogInfo($"processing file:{sourceFilePath}->{processingFile}");
+                //LogInfo($"processing file:{sourceFilePath}->{processingFile}");
 
                 
 
